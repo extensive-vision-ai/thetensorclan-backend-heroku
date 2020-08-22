@@ -50,7 +50,7 @@ def classify_indian_face(model, classes, image):
     The image sent to this MUST be aligned
     """
     trans: Compose = T.Compose([
-        T.Resize(160, 160),
+        T.Resize(160),
         T.ToTensor(),
         T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
