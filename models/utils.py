@@ -35,6 +35,12 @@ MODEL_REGISTER = {
         'class_file': 'indian_face_classes',
         'model_url': 'https://drive.google.com/uc?id=1jYVTVzY7PQZq2L-pbYApk42aXlv5XXKP',
         'classifier_func': classify_indian_face
+    },
+    'lfw-plus': {
+        'model_file': 'lfw_plus_model.traced',
+        'class_file': 'lfw_plus_classnames',
+        'model_url': 'https://drive.google.com/uc?id=1nFBXvf4eRiSmp_Wv_fUE_fDd7A9BJUDl',
+        'classifier_func': classify_lfw_plus
     }
 }
 
