@@ -114,7 +114,7 @@ def get_pose(image: Image.Image) -> Image.Image:
     return apply_pose_to_image(image=image, key_points=key_points, out_shape=(OUT_HEIGHT, OUT_WIDTH))
 
 
-def apply_pose_to_image(image: Image.Image, key_points, out_shape: Tuple[int, int] = (64, 64), thr: float = 0.7):
+def apply_pose_to_image(image: Image.Image, key_points, out_shape: Tuple[int, int] = (64, 64), thr: float = 0.5):
     image_p = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
     is_joint_plotted = [False for _ in range(len(JOINTS))]
 
