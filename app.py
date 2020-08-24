@@ -75,7 +75,7 @@ def classify_image_api(model_handle='resnet34-imagenet') -> Response:
 
 @app.route("/human-pose", methods=['POST'])
 @cross_origin()
-def classify_image_api() -> Response:
+def get_human_pose() -> Response:
     from models import get_pose
 
     if 'file' not in request.files:

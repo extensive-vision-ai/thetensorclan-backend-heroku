@@ -56,13 +56,14 @@ setup_model()
 # import poselib libraries
 from pose_lib.core.config import config
 from pose_lib.core.config import update_config
+import pose_lib.models as pmodels
 
 import torch
 
 update_config(CONFIG_FILE)
 config.GPUS = ''
 
-model = eval('models.' + config.MODEL.NAME + '.get_pose_net')(config, is_train=False)
+model = eval('pmodels.' + config.MODEL.NAME + '.get_pose_net')(config, is_train=False)
 model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device('cpu')))
 
 

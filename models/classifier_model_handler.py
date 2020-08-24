@@ -48,7 +48,7 @@ MODEL_REGISTER: Dict[str, Dict[str, Union[str, Any]]] = {
 }
 
 
-def get_classifier(model_name) -> partial[List[Dict[str, Any]]]:
+def get_classifier(model_name) -> Callable[[Image.Image], List[Dict[str, Any]]]:
     """
 
     Args:
