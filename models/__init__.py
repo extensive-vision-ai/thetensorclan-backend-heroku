@@ -1,1 +1,2 @@
-from .utils import get_classifier, MODEL_REGISTER
+from .classifier_model_handler import get_classifier, MODEL_REGISTER
+from .human_pose_handler import get_pose

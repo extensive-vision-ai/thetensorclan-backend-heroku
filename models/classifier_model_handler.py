@@ -1,23 +1,26 @@
 from __future__ import absolute_import
-from .classifiers import *
+from __future__ import division
+from __future__ import print_function
 
+import json
+import os
 from functools import partial
-import json, os, io
 from pathlib import Path
-import gdown
+from typing import Union, Callable
 
+import gdown
 import torch
 
-from utils import setup_logger
+from .classifiers import *
 
-logger = setup_logger(__name__)
+logger: Logger = setup_logger(__name__)
 
 '''
 The model file must have .pt extension
 The class file must have .json extension
 But the extensions are not explicitly mentioned here in the REGISTER
 '''
-MODEL_REGISTER = {
+MODEL_REGISTER: Dict[str, Dict[str, Union[str, Any]]] = {
     'resnet34-imagenet': {
         'model_file': 'mobilenetv2_imagenet',
         'class_file': 'imagenet_classes',
@@ -45,24 +48,33 @@ MODEL_REGISTER = {
 }
 
 
-def get_classifier(model_name):
+def get_classifier(model_name) -> partial[List[Dict[str, Any]]]:
+    """
+
+    Args:
+        model_name: the model_handel name, must be in MODEL_REGISTER
+
+    Returns:
+        (partial[List[Dict[str, Any]]]: a callable function that just needs the input image and it returns results
+    """
     model_files = MODEL_REGISTER[model_name]
 
-    classes_list = json.load(open(Path('models') / (model_files['class_file'] + '.json')))
+    classes_list: List[str] = json.load(open(Path('models') / (model_files['class_file'] + '.json')))
 
     if 'PRODUCTION' in os.environ:
         logger.info(f"=> Downloading Model {model_files['model_file']} from {model_files['model_url']}")
 
         # heroku gives you `/tmp` to store files, which can be cached
-        model_path = Path('/tmp') / f"{model_files['model_file']}.pt"
+        model_path: Path = Path('/tmp') / f"{model_files['model_file']}.pt"
         gdown.cached_download(url=model_files['model_url'], path=model_path)
 
         logger.info(f"=> Loading {model_files['model_file']} from download_cache")
-        model = torch.jit.load(str(model_path))
+        model: RecursiveScriptModule = torch.jit.load(str(model_path))
     else:
         logger.info(f"=> Loading {model_files['model_file']} from Local")
         model = torch.jit.load(str((Path('models') / (model_files['model_file'] + '.pt'))))
 
-    classifier = model_files['classifier_func']
+    classifier: Callable[[RecursiveScriptModule, List[str], Image.Image], List[Dict[str, Any]]] = \
+        model_files['classifier_func']
 
     return partial(classifier, model, classes_list)
