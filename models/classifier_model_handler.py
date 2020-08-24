@@ -66,7 +66,8 @@ def get_classifier(model_name) -> Callable[[Image.Image], List[Dict[str, Any]]]:
 
         # heroku gives you `/tmp` to store files, which can be cached
         model_path: Path = Path('/tmp') / f"{model_files['model_file']}.pt"
-        gdown.cached_download(url=model_files['model_url'], path=model_path)
+        if not model_path.exists():
+            gdown.cached_download(url=model_files['model_url'], path=model_path)
 
         logger.info(f"=> Loading {model_files['model_file']} from download_cache")
         model: RecursiveScriptModule = torch.jit.load(str(model_path))

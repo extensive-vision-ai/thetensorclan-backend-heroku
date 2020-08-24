@@ -17,6 +17,7 @@ conda create -n thetensorclan-aws python=3.7
 conda install pytorch torchvision cudatoolkit=10.2 -c pytorch
 conda install -c anaconda flask boto3 flask-cors
 conda install -c conda-forge dlib opencv
+pip install onnxruntime
 ```
 
 ## Notes

@@ -2,9 +2,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from typing import Tuple
+from typing import Tuple, Dict
 
 import gdown
+from onnxruntime import InferenceSession
 
 from utils import setup_logger
 
@@ -16,71 +17,50 @@ import numpy as np
 import copy
 import os.path as osp
 import re
+from pathlib import Path
 import os
 import sys
 import cv2
 from PIL import Image
 import torchvision.transforms as T
 import torch
+import onnxruntime
 
-
-def add_path(path):
-    if path not in sys.path:
-        sys.path.insert(0, path)
-
-
-# add the poselib to path
-this_dir = osp.dirname(__file__)
-pose_lib_path = osp.join(this_dir, '..', 'helper_repositories/human_pose_estimation_pytorch')
-add_path(pose_lib_path)
-
-RESNET_50_256x256 = 'https://drive.google.com/uc?id=1V2AaVpDSn-eS7jrFScHLJ-wvTFuQ0-Dc'
-CONFIG_FILE = osp.join(this_dir, '..',
-                       'helper_repositories/human_pose_estimation_pytorch/experiments/mpii/resnet50/256x256_d256x3_adam_lr1e-3.yaml')
-MODEL_PATH = '/tmp/pose_resnet_50_256x256.pth.tar'
+# model gdrive download url
+RESNET_50_256x256_ONNX_QUANT: Dict[str, str] = {
+    'model_file': 'pose_resnet_50_256x256.quantized.onnx',
+    'model_url': 'https://drive.google.com/uc?id=1CAefkMUP7ww_cq9MzBrMzA_INzSWaWdU'
+}
 
 
 # download and setup the model
-def setup_model():
+def get_ort_model() -> InferenceSession:
     if 'PRODUCTION' in os.environ:
         # heroku gives the /tmp directory for temporary files
-        MODEL_PATH = '/tmp/pose_resnet_50_256x256.pth.tar'
+        model_path: Path = Path('/tmp') / f"{RESNET_50_256x256_ONNX_QUANT['model_file']}"
     else:
-        MODEL_PATH = './pose_resnet_50_256x256.pth.tar'
-    # download the model
-    if not os.path.exists(MODEL_PATH):
-        logger.info(f'Downloading {MODEL_PATH}')
-        gdown.download(url=RESNET_50_256x256, output=MODEL_PATH)
-    # gdown.cached_download(url=RESNET_50_256x256, path=MODEL_PATH)
+        model_path: Path = Path('./') / f"{RESNET_50_256x256_ONNX_QUANT['model_file']}"
+
+    if not model_path.exists():
+        logger.info(f"Downloading Model : {RESNET_50_256x256_ONNX_QUANT['model_file']}")
+        gdown.cached_download(url=RESNET_50_256x256_ONNX_QUANT['model_url'], path=model_path)
+
+    ort_session: InferenceSession = onnxruntime.InferenceSession(str(model_path))
+
+    return ort_session
 
 
-setup_model()
-
-# import poselib libraries
-from pose_lib.core.config import config
-from pose_lib.core.config import update_config
-import pose_lib.models as pmodels
-
-import torch
-
-update_config(CONFIG_FILE)
-config.GPUS = ''
-
-logger.info('=> Loading the Pose Model')
-model = eval('pmodels.' + config.MODEL.NAME + '.get_pose_net')(config, is_train=False)
-model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device('cpu')))
-
-
+# some MPII specific stuff
 JOINTS = ['0 - r ankle', '1 - r knee', '2 - r hip', '3 - l hip', '4 - l knee', '5 - l ankle', '6 - pelvis', '7 - thorax', '8 - upper neck', '9 - head top', '10 - r wrist', '11 - r elbow', '12 - r shoulder', '13 - l shoulder', '14 - l elbow', '15 - l wrist']
 JOINTS = [re.sub(r'[0-9]+|-', '', joint).strip().replace(' ', '-') for joint in JOINTS]
 
 POSE_PAIRS = [
-# UPPER BODY
+              # UPPER BODY
               [9, 8],
               [8, 7],
               [7, 6],
 
-# LOWER BODY
+              # LOWER BODY
               [6, 2],
               [2, 1],
               [1, 0],
@@ -89,7 +69,7 @@ POSE_PAIRS = [
               [3, 4],
               [4, 5],
 
-# ARMS
+              # ARMS
               [7, 12],
               [12, 11],
               [11, 10],
@@ -104,6 +84,10 @@ def get_detached(x: torch.Tensor):
     return copy.deepcopy(x.cpu().detach().numpy())
 
 
+def to_numpy(tensor):
+    return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
+
+
 get_keypoints = lambda pose_layers: map(itemgetter(1, 3), [cv2.minMaxLoc(pose_layer) for pose_layer in pose_layers])
 
 
@@ -116,11 +100,15 @@ def get_pose(image: Image.Image) -> Image.Image:
 
     tr_img: torch.Tensor = transform(image)
 
-    output: torch.Tensor = model(tr_img.unsqueeze(0))
-    output = output.squeeze(0)
+    ort_model: InferenceSession = get_ort_model()
+
+    ort_inputs = {ort_model.get_inputs()[0].name: to_numpy(tr_img.unsqueeze(0))}
+    ort_outs = ort_model.run(None, ort_inputs)
+    output = np.array(ort_outs[0][0])
+
     _, OUT_HEIGHT, OUT_WIDTH = output.shape
 
-    pose_layers = get_detached(x=output)
+    pose_layers = output
     key_points = list(get_keypoints(pose_layers=pose_layers))
 
     return apply_pose_to_image(image=image, key_points=key_points, out_shape=(OUT_HEIGHT, OUT_WIDTH))
