@@ -48,7 +48,10 @@ def setup_model():
     else:
         MODEL_PATH = './pose_resnet_50_256x256.pth.tar'
     # download the model
-    gdown.cached_download(url=RESNET_50_256x256, path=MODEL_PATH)
+    if not os.path.exists(MODEL_PATH):
+        logger.info(f'Downloading {MODEL_PATH}')
+        gdown.download(url=RESNET_50_256x256, output=MODEL_PATH)
+    # gdown.cached_download(url=RESNET_50_256x256, path=MODEL_PATH)
 
 
 setup_model()
@@ -63,6 +66,7 @@ import torch
 update_config(CONFIG_FILE)
 config.GPUS = ''
 
+logger.info('=> Loading the Pose Model')
 model = eval('pmodels.' + config.MODEL.NAME + '.get_pose_net')(config, is_train=False)
 model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device('cpu')))
 
