@@ -37,7 +37,7 @@ add_path(pose_lib_path)
 RESNET_50_256x256 = 'https://drive.google.com/uc?id=1V2AaVpDSn-eS7jrFScHLJ-wvTFuQ0-Dc'
 CONFIG_FILE = osp.join(this_dir, '..',
                        'helper_repositories/human_pose_estimation_pytorch/experiments/mpii/resnet50/256x256_d256x3_adam_lr1e-3.yaml')
-MODEL_PATH = './pose_resnet_50_256x256.pth.tar'
+MODEL_PATH = '/tmp/pose_resnet_50_256x256.pth.tar'
 
 
 # download and setup the model
