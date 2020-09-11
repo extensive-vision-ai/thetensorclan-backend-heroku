@@ -12,9 +12,10 @@ from PIL.Image import Image
 from flask import Flask, jsonify, request, Response
 from flask_cors import CORS, cross_origin
 from werkzeug.datastructures import FileStorage
+import numpy as np
 
 from models import get_classifier
-from models.classifier_model_handler import MODEL_REGISTER
+from models.model_handlers import MODEL_REGISTER, get_generator
 from utils import setup_logger, allowed_file, file2image
 from utils.upload_utils import image2b64
 
@@ -73,9 +74,43 @@ def classify_image_api(model_handle='resnet34-imagenet') -> Response:
         return Response({'error': f'{file.mimetype} not allowed'}, status=412)
 
 
+@app.route("/generators/<model_handle>", methods=['POST'])
+@cross_origin()
+def generator_api(model_handle='red-car-gan-generator') -> Response:
+
+    if model_handle not in MODEL_REGISTER:
+        return Response({'error': f'{model_handle} not found in registered models'}, status=404)
+
+    if model_handle in MODEL_REGISTER and MODEL_REGISTER[model_handle]['type'] != 'gan-generator':
+        return Response({'error': f'{model_handle} model is not a GAN'}, status=412)
+
+    if 'latent_z' not in request.form:
+        return Response({'error': 'latent_z not found in the form'}, status=412)
+
+    latent_z = json.loads(f"[{request.form['latent_z']}]")
+    latent_z = np.array(latent_z, dtype=np.float32)
+
+    generator = get_generator(model_handle)
+    output = generator(latent_z)
+
+    # convert it to b64 bytes
+    b64_pose = image2b64(output)
+
+    return jsonify(b64_pose), 200
+
+
 @app.route("/human-pose", methods=['POST'])
 @cross_origin()
 def get_human_pose() -> Response:
+    """
+
+    Handles the human pose POST request, takes the pose image and identifies the human pose keypoints,
+        stitches them together and returns a response with the image as b64 encoded, with the detected human pose
+
+    Returns:
+        (Response): b64 image string with the detected human pose
+
+    """
     from models import get_pose
 
     if 'file' not in request.files:
