@@ -38,10 +38,15 @@ def autoencode_red_car(model: RecursiveScriptModule, image: Image.Image) -> Tupl
     unorm: UnNormalize = UnNormalize(mean=[0.570838093757629, 0.479552984237671, 0.491760671138763],
                                      std=[0.279659748077393, 0.309973508119583, 0.311098515987396])
 
-    img_tensor: Tensor = trans(image).unqueeze(0)
+    img_tensor: Tensor = trans(image).unsqueeze(0)
 
     with torch.no_grad():
-        reconstructed_x,  mu, _ = model(img_tensor).squeeze(0)
+        reconstructed_x: Tensor
+        mu: Tensor
+
+        reconstructed_x,  mu, _ = model(img_tensor)
+        reconstructed_x.squeeze_(0)
+        mu.squeeze_(0)
 
     # un-normalize the values, the model has learnt normalize values and predicts
     # thus

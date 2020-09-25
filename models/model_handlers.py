@@ -61,8 +61,8 @@ MODEL_REGISTER: Dict[str, Dict[str, Union[str, Any]]] = {
         'model_url': 'https://drive.google.com/uc?id=1mAJii2AljsY00c-4VkETDyyjgh_K0nNv',
         'generator_func': generate_red_car_gan
     },
-    'red-car-auto-encoder': {
-        'type': 'variational-auto-encoder',
+    'red-car-autoencoder': {
+        'type': 'variational-autoencoder',
         'latent_z_size': 2048,
         'model_file': 'redcar_vae_128x128.traced',
         'model_url': 'https://drive.google.com/uc?id=14lp_ZcLu--vwlITB3zYZCjQKJIwuQ55P',

@@ -10,7 +10,7 @@ from typing import Tuple, Any
 import numpy as np
 from PIL import ImageFile
 from PIL.Image import Image
-from flask import Flask, jsonify, request, Response
+from flask import Flask, jsonify, request, Response, make_response
 from flask_cors import CORS, cross_origin
 from werkzeug.datastructures import FileStorage
 
@@ -114,7 +114,7 @@ def generator_api(model_handle='red-car-gan-generator') -> Response:
 
 @app.route("/autoencoders/<model_handle>", methods=['POST'])
 @cross_origin()
-def autoencoder_api(model_handle='red-car-auto-encoder') -> Response:
+def autoencoder_api(model_handle='red-car-autoencoder') -> Response:
     """
 
     autoencoder_api
@@ -135,33 +135,35 @@ def autoencoder_api(model_handle='red-car-auto-encoder') -> Response:
 
     """
     if model_handle not in MODEL_REGISTER:
-        return Response({'error': f'{model_handle} not found in registered models'}, status=404)
+        return make_response(jsonify({'error': f'{model_handle} not found in registered models'}), 404)
 
-    if model_handle in MODEL_REGISTER and MODEL_REGISTER[model_handle]['type'] != 'variational-auto-encoder':
-        return Response({'error': f'{model_handle} model is not an AutoEncoder'}, status=412)
+    if model_handle in MODEL_REGISTER and MODEL_REGISTER[model_handle]['type'] != 'variational-autoencoder':
+        return make_response(jsonify({'error': f'{model_handle} model is not an AutoEncoder'}), 412)
 
-    if 'file' not in request.form:
-        return Response({'error': 'No file part'}, status=412)
+    if 'file' not in request.files:
+        return make_response(jsonify({'error': 'No file part'}), 412)
 
     file: FileStorage = request.files['file']
 
     if file.filename == '':
-        return Response({'error': 'No file selected'}, status=417)
+        return make_response(jsonify({'error': 'No file selected'}), 417)
 
     if allowed_file(file.filename):
         image: Image = file2image(file)
         autoencoder = get_autoencoder(model_handle)
+        output: Image
+        latent_z: np.ndarray
         output, latent_z = autoencoder(image)
 
         # convert it to b64 bytes
         b64_image = image2b64(output)
-        return Response(json.dumps(dict(
+        return make_response(jsonify(dict(
             recon_image=b64_image,
-            latent_z=latent_z
-        )), status=200)
+            latent_z=latent_z.tolist()
+        )), 200)
 
     else:
-        return Response({'error': f'{file.mimetype} not allowed'}, status=412)
+        return make_response(jsonify({'error': f'{file.mimetype} not allowed'}), 412)
 
 
 @app.route("/human-pose", methods=['POST'])
