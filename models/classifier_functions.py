@@ -53,8 +53,6 @@ def classify_mobilenetv2_ifo(model: RecursiveScriptModule, classes: List[str], i
     predicted = F.softmax(predicted)
     sorted_values = predicted.argsort(descending=True).cpu().numpy()
 
-    logger.info(sorted_values)
-
     top4pred: List[Dict[str, Any]] = list(
         map(lambda x: {'class_idx': x.item(), 'class_name': classes[x], 'confidence': predicted[x].item()},
             sorted_values))[:4]

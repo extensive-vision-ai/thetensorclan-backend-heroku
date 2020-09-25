@@ -4,13 +4,12 @@ from __future__ import print_function
 
 from logging import Logger
 
-import torch
-from numpy import uint8
-from torch.jit import RecursiveScriptModule
-from  typing import List
-from torch import Tensor
 import numpy as np
-from PIL import  Image
+import torch
+from PIL import Image
+from numpy import uint8
+from torch import Tensor
+from torch.jit import RecursiveScriptModule
 
 from utils import setup_logger
 
@@ -33,6 +32,21 @@ def norm_tensor_(t) -> None:
 
 
 def generate_red_car_gan(model: RecursiveScriptModule, latent_z: np.ndarray) -> Image.Image:
+    """
+    generate_red_car_gan
+
+        a generator function for the Red Car GAN, which takes in a latent z vector
+        and generates a red car based on those values
+
+    Args:
+        model: the red car gan traced and loaded generator model
+        latent_z: the latent z vector for the generator
+
+    Returns:
+        Image: The generated image from the model
+
+    """
+
     latent_z: Tensor = torch.tensor(latent_z)
     latent_z = latent_z.reshape(-1, 1, 1)
     latent_z = latent_z.unsqueeze(0)
@@ -44,7 +58,7 @@ def generate_red_car_gan(model: RecursiveScriptModule, latent_z: np.ndarray) -> 
     # normalize the values to [0, 1]
     norm_tensor_(fake)
     # to change from C, H, W -> H, W, C
-    fake = fake.permute(1, 2, 0)
+    fake: Tensor = fake.permute(1, 2, 0)
 
     # convert it to uint8 array for PIL to create a Image out of it
     fake_img_arr: uint8 = np.uint8((fake.numpy() * 255).astype(int))

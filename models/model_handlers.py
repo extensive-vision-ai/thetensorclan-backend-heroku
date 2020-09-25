@@ -6,7 +6,7 @@ import json
 import os
 from functools import partial
 from pathlib import Path
-from typing import Union, Callable, Dict, Any, List
+from typing import Union, Callable, Dict, Any, List, Tuple
 
 import gdown
 import torch
@@ -14,6 +14,7 @@ from torch.jit import RecursiveScriptModule
 
 from .classifier_functions import *
 from .generator_functions import *
+from .autoencoder_functions import *
 
 logger: Logger = setup_logger(__name__)
 
@@ -59,6 +60,13 @@ MODEL_REGISTER: Dict[str, Dict[str, Union[str, Any]]] = {
         'model_file': 'red_car_gan_generator.traced',
         'model_url': 'https://drive.google.com/uc?id=1mAJii2AljsY00c-4VkETDyyjgh_K0nNv',
         'generator_func': generate_red_car_gan
+    },
+    'red-car-auto-encoder': {
+        'type': 'variational-auto-encoder',
+        'latent_z_size': 2048,
+        'model_file': 'redcar_vae_128x128.traced',
+        'model_url': 'https://drive.google.com/uc?id=14lp_ZcLu--vwlITB3zYZCjQKJIwuQ55P',
+        'autoencoder_func': autoencode_red_car
     }
 }
 
@@ -125,7 +133,18 @@ def get_classifier(model_name) -> Callable[[Image.Image], List[Dict[str, Any]]]:
 
 
 def get_generator(model_name) -> Callable[[np.ndarray], Any]:
+    """
+    get_generator
 
+    fetches the generator function for the given model from the MODEL_REGISTER
+
+    Args:
+        model_name: the model name registered in MODEL_REGISTER
+
+    Returns:
+       (Callable[[np.ndarray], Any]): a callable function that takes the input latent_z
+            and returns the generated image
+    """
     model_files: Dict[str, Union[str, Any]] = MODEL_REGISTER[model_name]
 
     model: RecursiveScriptModule = download_and_loadmodel(model_files)
@@ -134,3 +153,26 @@ def get_generator(model_name) -> Callable[[np.ndarray], Any]:
 
     return partial(generator_func, model)
 
+
+def get_autoencoder(model_name) -> Callable[[Image.Image], Tuple[Image.Image, np.ndarray]]:
+    """
+    get_autoencoder
+
+    fetches the generator function for the given model from the MODEL_REGISTER, downloads the model
+        from google drives, and returns a partially applied function that only needs the input to the model
+        and the function gives the output of the model, in a required way by this backend
+
+    Args:
+        model_name: the model name registered in MODEL_REGISTER
+
+    Returns:
+       (Callable[[np.ndarray], Tuple[Image.Image, np.ndarray]]): a callable function that takes the input latent_z
+            and returns the generated image and the encoded latent_z numpy array
+    """
+    model_files: Dict[str, Union[str, Any]] = MODEL_REGISTER[model_name]
+
+    model: RecursiveScriptModule = download_and_loadmodel(model_files)
+
+    generator_func: Callable[[RecursiveScriptModule, np.ndarray], Any] = model_files['autoencoder_func']
+
+    return partial(generator_func, model)
