@@ -78,7 +78,7 @@ def classify_image_api(model_handle='resnet34-imagenet') -> Response:
 @cross_origin()
 def generator_api(model_handle='red-car-gan-generator') -> Response:
     """
-        generator_api
+    generator_api
 
         This is the generator end point, that has the model handle as the parameter
             and takes in the latent_z values in the POST requests, followed by passing this
@@ -92,24 +92,49 @@ def generator_api(model_handle='red-car-gan-generator') -> Response:
 
     """
     if model_handle not in MODEL_REGISTER:
-        return Response({'error': f'{model_handle} not found in registered models'}, status=404)
+        return make_response(jsonify({'error': f'{model_handle} not found in registered models'}), 404)
 
     if model_handle in MODEL_REGISTER and MODEL_REGISTER[model_handle]['type'] != 'gan-generator':
-        return Response({'error': f'{model_handle} model is not a GAN'}, status=412)
+        return make_response(jsonify({'error': f'{model_handle} model is not a GAN'}), 412)
 
-    if 'latent_z' not in request.form:
-        return Response({'error': 'latent_z not found in the form'}, status=412)
+    if 'latent_z_size' in MODEL_REGISTER[model_handle]:
+        # this is a latentz input type of gan model
+        if 'latent_z' not in request.form:
+            return make_response(jsonify({'error': 'latent_z not found in the form'}), 412)
 
-    latent_z = json.loads(f"[{request.form['latent_z']}]")
-    latent_z = np.array(latent_z, dtype=np.float32)
+        latent_z = json.loads(f"[{request.form['latent_z']}]")
+        latent_z = np.array(latent_z, dtype=np.float32)
 
-    generator = get_generator(model_handle)
-    output = generator(latent_z)
+        generator = get_generator(model_handle)
+        output = generator(latent_z)
 
-    # convert it to b64 bytes
-    b64_image = image2b64(output)
+        # convert it to b64 bytes
+        b64_image = image2b64(output)
 
-    return jsonify(b64_image), 200
+        return make_response(jsonify(b64_image), 200)
+
+    if 'input_shape' in MODEL_REGISTER[model_handle]:
+        # this is a image input type of gan model
+
+        if 'file' not in request.files:
+            return make_response(jsonify({'error': 'No file part'}), 412)
+
+        file: FileStorage = request.files['file']
+
+        if file.filename == '':
+            return make_response(jsonify({'error': 'No file selected'}), 417)
+
+        if allowed_file(file.filename):
+            image: Image = file2image(file)
+            generator = get_generator(model_handle)
+            output = generator(image)
+
+            # convert it to b64 bytes
+            b64_image = image2b64(output)
+
+            return make_response(jsonify(b64_image), 200)
+
+    return make_response(jsonify({'error': f'{model_handle} is not a valid GAN'}), 412)
 
 
 @app.route("/autoencoders/<model_handle>", methods=['POST'])

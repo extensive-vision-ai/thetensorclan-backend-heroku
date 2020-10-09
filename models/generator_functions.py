@@ -10,6 +10,7 @@ from PIL import Image
 from numpy import uint8
 from torch import Tensor
 from torch.jit import RecursiveScriptModule
+import torchvision.transforms as T
 
 from utils import setup_logger
 
@@ -62,5 +63,27 @@ def generate_red_car_gan(model: RecursiveScriptModule, latent_z: np.ndarray) -> 
 
     # convert it to uint8 array for PIL to create a Image out of it
     fake_img_arr: uint8 = np.uint8((fake.numpy() * 255).astype(int))
+
+    return Image.fromarray(fake_img_arr)
+
+
+def generate_ifo_sr_gan(model: RecursiveScriptModule, image: Image.Image) -> Image.Image:
+
+    trans: T.Compose = T.Compose([
+        T.Resize((200, 200)),
+        T.ToTensor(),
+    ])
+
+    img_tensor: Tensor = trans(image).unsqueeze(0)
+
+    with torch.no_grad():
+        sr_image: Tensor = model(img_tensor)
+        sr_image = sr_image.squeeze(0)
+
+    # to change from C, H, W -> H, W, C
+    sr_image: Tensor = sr_image.permute(1, 2, 0)
+
+    # convert it to uint8 array for PIL to create a Image out of it
+    fake_img_arr: uint8 = np.uint8((sr_image.numpy() * 255).astype(int))
 
     return Image.fromarray(fake_img_arr)

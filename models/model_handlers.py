@@ -67,6 +67,13 @@ MODEL_REGISTER: Dict[str, Dict[str, Union[str, Any]]] = {
         'model_file': 'redcar_vae_128x128.traced',
         'model_url': 'https://drive.google.com/uc?id=14lp_ZcLu--vwlITB3zYZCjQKJIwuQ55P',
         'autoencoder_func': autoencode_red_car
+    },
+    'ifo-sr-gan': {
+        'type': 'gan-generator',
+        'input_shape': (3, 200, 200),
+        'model_file': 'ifo_sr_model.traced',
+        'model_url': 'https://drive.google.com/uc?id=1MY5jUBN-dWssYbIU6sgQDBu2I70i-nik',
+        'generator_func': generate_ifo_sr_gan
     }
 }
 
@@ -132,7 +139,7 @@ def get_classifier(model_name) -> Callable[[Image.Image], List[Dict[str, Any]]]:
     return partial(classifier, model, classes_list)
 
 
-def get_generator(model_name) -> Callable[[np.ndarray], Any]:
+def get_generator(model_name) -> Callable[[Union[np.ndarray, Image.Image]], Any]:
     """
     get_generator
 
@@ -149,7 +156,7 @@ def get_generator(model_name) -> Callable[[np.ndarray], Any]:
 
     model: RecursiveScriptModule = download_and_loadmodel(model_files)
 
-    generator_func: Callable[[RecursiveScriptModule, np.ndarray], Any] = model_files['generator_func']
+    generator_func: Callable[[RecursiveScriptModule, Union[np.ndarray, Image.Image]], Any] = model_files['generator_func']
 
     return partial(generator_func, model)
 
