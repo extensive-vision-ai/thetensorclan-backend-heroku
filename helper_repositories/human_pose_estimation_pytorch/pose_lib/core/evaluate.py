@@ -29,7 +29,7 @@ def calc_dists(preds, target, normalize):
 
 
 def dist_acc(dists, thr=0.5):
-    ''' Return percentage below threshold while ignoring values with a -1 '''
+    """ Return percentage below threshold while ignoring values with a -1 """
     dist_cal = np.not_equal(dists, -1)
     num_dist_cal = dist_cal.sum()
     if num_dist_cal > 0:
@@ -38,16 +38,16 @@ def dist_acc(dists, thr=0.5):
         return -1
 
 
-def accuracy(output, target, hm_type='gaussian', thr=0.5):
-    '''
+def accuracy(output, target, hm_type="gaussian", thr=0.5):
+    """
     Calculate accuracy according to PCK,
     but uses ground truth heatmap rather than x,y locations
     First value to be returned is average accuracy across 'idxs',
     followed by individual accuracies
-    '''
+    """
     idx = list(range(output.shape[1]))
     norm = 1.0
-    if hm_type == 'gaussian':
+    if hm_type == "gaussian":
         pred, _ = get_max_preds(output)
         target, _ = get_max_preds(target)
         h = output.shape[2]

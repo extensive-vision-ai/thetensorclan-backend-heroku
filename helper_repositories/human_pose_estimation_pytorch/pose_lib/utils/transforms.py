@@ -13,11 +13,12 @@ import cv2
 
 
 def flip_back(output_flipped, matched_parts):
-    '''
+    """
     ouput_flipped: numpy.ndarray(batch_size, num_joints, height, width)
-    '''
-    assert output_flipped.ndim == 4,\
-        'output_flipped should be [batch_size, num_joints, height, width]'
+    """
+    assert (
+        output_flipped.ndim == 4
+    ), "output_flipped should be [batch_size, num_joints, height, width]"
 
     output_flipped = output_flipped[:, :, :, ::-1]
 
@@ -38,12 +39,16 @@ def fliplr_joints(joints, joints_vis, width, matched_parts):
 
     # Change left-right parts
     for pair in matched_parts:
-        joints[pair[0], :], joints[pair[1], :] = \
-            joints[pair[1], :], joints[pair[0], :].copy()
-        joints_vis[pair[0], :], joints_vis[pair[1], :] = \
-            joints_vis[pair[1], :], joints_vis[pair[0], :].copy()
+        joints[pair[0], :], joints[pair[1], :] = (
+            joints[pair[1], :],
+            joints[pair[0], :].copy(),
+        )
+        joints_vis[pair[0], :], joints_vis[pair[1], :] = (
+            joints_vis[pair[1], :],
+            joints_vis[pair[0], :].copy(),
+        )
 
-    return joints*joints_vis, joints_vis
+    return joints * joints_vis, joints_vis
 
 
 def transform_preds(coords, center, scale, output_size):
@@ -54,12 +59,9 @@ def transform_preds(coords, center, scale, output_size):
     return target_coords
 
 
-def get_affine_transform(center,
-                         scale,
-                         rot,
-                         output_size,
-                         shift=np.array([0, 0], dtype=np.float32),
-                         inv=0):
+def get_affine_transform(
+    center, scale, rot, output_size, shift=np.array([0, 0], dtype=np.float32), inv=0
+):
     if not isinstance(scale, np.ndarray) and not isinstance(scale, list):
         print(scale)
         scale = np.array([scale, scale])
@@ -92,7 +94,7 @@ def get_affine_transform(center,
 
 
 def affine_transform(pt, t):
-    new_pt = np.array([pt[0], pt[1], 1.]).T
+    new_pt = np.array([pt[0], pt[1], 1.0]).T
     new_pt = np.dot(t, new_pt)
     return new_pt[:2]
 
@@ -115,9 +117,8 @@ def get_dir(src_point, rot_rad):
 def crop(img, center, scale, output_size, rot=0):
     trans = get_affine_transform(center, scale, rot, output_size)
 
-    dst_img = cv2.warpAffine(img,
-                             trans,
-                             (int(output_size[0]), int(output_size[1])),
-                             flags=cv2.INTER_LINEAR)
+    dst_img = cv2.warpAffine(
+        img, trans, (int(output_size[0]), int(output_size[1])), flags=cv2.INTER_LINEAR
+    )
 
     return dst_img

@@ -31,4 +31,6 @@ face/shape_predictor_68_face_landmarks.dat.bz2
 
 # models
 *.pt
+*.pkl
 /pose_resnet_50_256x256.quantized.onnx
+/models/conv-sentimental-vocab.pkl

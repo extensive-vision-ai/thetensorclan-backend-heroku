@@ -6,79 +6,113 @@ import json
 import os
 from functools import partial
 from pathlib import Path
-from typing import Union, Callable, Dict, Any, List, Tuple
+from typing import Union, Callable
 
+import pickle
 import gdown
 import torch
+import torchtext
 from torch.jit import RecursiveScriptModule
 
+from .autoencoder_functions import *
 from .classifier_functions import *
 from .generator_functions import *
-from .autoencoder_functions import *
+from .text_functions import *
 
 logger: Logger = setup_logger(__name__)
 
-'''
+"""
 The model file must have .pt extension
 The class file must have .json extension
 But the extensions are not explicitly mentioned here in the REGISTER
 
 Also we have different types of models, the 'type' specifies the type of model
-'''
+"""
 MODEL_REGISTER: Dict[str, Dict[str, Union[str, Any]]] = {
-    'resnet34-imagenet': {
-        'type': 'classification',
-        'model_file': 'mobilenetv2_imagenet',
-        'class_file': 'imagenet_classes',
-        'model_url': 'https://drive.google.com/uc?id=1fqEXHD5fsqccSRjuIBTs8pJ8CLpp5FVz',
-        'classifier_func': classify_resnet34_imagenet
+    "resnet34-imagenet": {
+        "type": "classification",
+        "model_file": "mobilenetv2_imagenet",
+        "class_file": "imagenet_classes",
+        "model_url": "https://drive.google.com/uc?id=1fqEXHD5fsqccSRjuIBTs8pJ8CLpp5FVz",
+        "classifier_func": classify_resnet34_imagenet,
     },
-    'mobilenetv2-ifo': {
-        'type': 'classification',
-        'model_file': 'mobilenetv2_ifo.traced',
-        'class_file': 'ifo_classes',
-        'model_url': 'https://drive.google.com/uc?id=1x130XEWyHBRy6Xbc4QHCH_Me1NXSicjj',
-        'classifier_func': classify_mobilenetv2_ifo
+    "mobilenetv2-ifo": {
+        "type": "classification",
+        "model_file": "mobilenetv2_ifo.traced",
+        "class_file": "ifo_classes",
+        "model_url": "https://drive.google.com/uc?id=1x130XEWyHBRy6Xbc4QHCH_Me1NXSicjj",
+        "classifier_func": classify_mobilenetv2_ifo,
     },
-    'indian-face': {
-        'type': 'classification',
-        'model_file': 'indian_face_model.traced',
-        'class_file': 'indian_face_classes',
-        'model_url': 'https://drive.google.com/uc?id=1jYVTVzY7PQZq2L-pbYApk42aXlv5XXKP',
-        'classifier_func': classify_indian_face
+    "indian-face": {
+        "type": "classification",
+        "model_file": "indian_face_model.traced",
+        "class_file": "indian_face_classes",
+        "model_url": "https://drive.google.com/uc?id=1jYVTVzY7PQZq2L-pbYApk42aXlv5XXKP",
+        "classifier_func": classify_indian_face,
     },
-    'lfw-plus': {
-        'type': 'classification',
-        'model_file': 'lfw_plus_model.traced',
-        'class_file': 'lfw_plus_classnames',
-        'model_url': 'https://drive.google.com/uc?id=1nFBXvf4eRiSmp_Wv_fUE_fDd7A9BJUDl',
-        'classifier_func': classify_lfw_plus
+    "lfw-plus": {
+        "type": "classification",
+        "model_file": "lfw_plus_model.traced",
+        "class_file": "lfw_plus_classnames",
+        "model_url": "https://drive.google.com/uc?id=1nFBXvf4eRiSmp_Wv_fUE_fDd7A9BJUDl",
+        "classifier_func": classify_lfw_plus,
     },
-    'red-car-gan-generator': {
-        'type': 'gan-generator',
-        'latent_z_size': 64,
-        'model_file': 'red_car_gan_generator.traced',
-        'model_url': 'https://drive.google.com/uc?id=1mAJii2AljsY00c-4VkETDyyjgh_K0nNv',
-        'generator_func': generate_red_car_gan
+    "red-car-gan-generator": {
+        "type": "gan-generator",
+        "latent_z_size": 64,
+        "model_file": "red_car_gan_generator.traced",
+        "model_url": "https://drive.google.com/uc?id=1mAJii2AljsY00c-4VkETDyyjgh_K0nNv",
+        "generator_func": generate_red_car_gan,
     },
-    'red-car-autoencoder': {
-        'type': 'variational-autoencoder',
-        'latent_z_size': 2048,
-        'model_file': 'redcar_vae_128x128.traced',
-        'model_url': 'https://drive.google.com/uc?id=14lp_ZcLu--vwlITB3zYZCjQKJIwuQ55P',
-        'autoencoder_func': autoencode_red_car
+    "red-car-autoencoder": {
+        "type": "variational-autoencoder",
+        "latent_z_size": 2048,
+        "model_file": "redcar_vae_128x128.traced",
+        "model_url": "https://drive.google.com/uc?id=14lp_ZcLu--vwlITB3zYZCjQKJIwuQ55P",
+        "autoencoder_func": autoencode_red_car,
     },
-    'ifo-sr-gan': {
-        'type': 'gan-generator',
-        'input_shape': (3, 200, 200),
-        'model_file': 'ifo_sr_model.traced',
-        'model_url': 'https://drive.google.com/uc?id=1MY5jUBN-dWssYbIU6sgQDBu2I70i-nik',
-        'generator_func': generate_ifo_sr_gan
-    }
+    "ifo-sr-gan": {
+        "type": "gan-generator",
+        "input_shape": (3, 200, 200),
+        "model_file": "ifo_sr_model.traced",
+        "model_url": "https://drive.google.com/uc?id=1MY5jUBN-dWssYbIU6sgQDBu2I70i-nik",
+        "generator_func": generate_ifo_sr_gan,
+    },
+    "conv-sentimental-mclass": {
+        "type": "text-sentiment",
+        "vocab_file": "conv-sentimental-vocab",
+        "vocab_url": "https://drive.google.com/uc?id=17Se87VyWyFpmvCy56R92k6McUL6pb_u7",
+        "model_file": "conv-sentimental-mclass.scripted",
+        "model_url": "https://drive.google.com/uc?id=1vJ7OLV5Y-xTX_xL3C0QgdT6qhmjIF0cj",
+        "text_func": classify_conv_sentimental_mclass,
+    },
 }
 
 
-def download_and_loadmodel(model_files) -> RecursiveScriptModule:
+def download_and_load_vocab(model_files) -> Dict[str, Vocab]:
+    if "PRODUCTION" in os.environ:
+        logger.info(
+            f"=> Downloading Vocab file {model_files['vocab_file']} from {model_files['vocab_url']}"
+        )
+
+        # heroku gives you `/tmp` to store files, which can be cached
+        vocab_path: Path = Path("/tmp") / f"{model_files['vocab_file']}.pkl"
+        if not vocab_path.exists():
+            gdown.cached_download(url=model_files["vocab_url"], path=vocab_path)
+
+        logger.info(f"=> Loading {model_files['vocab_file']} from download_cache")
+        with vocab_path.open("rb") as vocab_file:
+            vocab: Dict[str, Vocab] = pickle.load(vocab_file)
+    else:
+        logger.info(f"=> Loading {model_files['vocab_file']} from Local")
+        vocab_path: Path = Path("models") / (model_files["vocab_file"] + ".pkl")
+        with vocab_path.open("rb") as vocab_file:
+            vocab: Dict[str, Vocab] = pickle.load(vocab_file)
+
+    return vocab
+
+
+def download_and_load_model(model_files) -> RecursiveScriptModule:
     """
 
     Downloads and torch.jit.load the model from google drive, the downloaded model is saved in /tmp
@@ -91,19 +125,23 @@ def download_and_loadmodel(model_files) -> RecursiveScriptModule:
     Returns:
         (RecursiveScriptModule): the loaded torch.jit model
     """
-    if 'PRODUCTION' in os.environ:
-        logger.info(f"=> Downloading Model {model_files['model_file']} from {model_files['model_url']}")
+    if "PRODUCTION" in os.environ:
+        logger.info(
+            f"=> Downloading Model {model_files['model_file']} from {model_files['model_url']}"
+        )
 
         # heroku gives you `/tmp` to store files, which can be cached
-        model_path: Path = Path('/tmp') / f"{model_files['model_file']}.pt"
+        model_path: Path = Path("/tmp") / f"{model_files['model_file']}.pt"
         if not model_path.exists():
-            gdown.cached_download(url=model_files['model_url'], path=model_path)
+            gdown.cached_download(url=model_files["model_url"], path=model_path)
 
         logger.info(f"=> Loading {model_files['model_file']} from download_cache")
         model: RecursiveScriptModule = torch.jit.load(str(model_path))
     else:
         logger.info(f"=> Loading {model_files['model_file']} from Local")
-        model = torch.jit.load(str((Path('models') / (model_files['model_file'] + '.pt'))))
+        model = torch.jit.load(
+            str((Path("models") / (model_files["model_file"] + ".pt")))
+        )
 
     return model
 
@@ -129,12 +167,15 @@ def get_classifier(model_name) -> Callable[[Image.Image], List[Dict[str, Any]]]:
     """
     model_files: Dict[str, Union[str, Any]] = MODEL_REGISTER[model_name]
 
-    classes_list: List[str] = json.load(open(Path('models') / (model_files['class_file'] + '.json')))
+    classes_list: List[str] = json.load(
+        open(Path("models") / (model_files["class_file"] + ".json"))
+    )
 
-    model: RecursiveScriptModule = download_and_loadmodel(model_files)
+    model: RecursiveScriptModule = download_and_load_model(model_files)
 
-    classifier: Callable[[RecursiveScriptModule, List[str], Image.Image], List[Dict[str, Any]]] = \
-        model_files['classifier_func']
+    classifier: Callable[
+        [RecursiveScriptModule, List[str], Image.Image], List[Dict[str, Any]]
+    ] = model_files["classifier_func"]
 
     return partial(classifier, model, classes_list)
 
@@ -154,14 +195,18 @@ def get_generator(model_name) -> Callable[[Union[np.ndarray, Image.Image]], Any]
     """
     model_files: Dict[str, Union[str, Any]] = MODEL_REGISTER[model_name]
 
-    model: RecursiveScriptModule = download_and_loadmodel(model_files)
+    model: RecursiveScriptModule = download_and_load_model(model_files)
 
-    generator_func: Callable[[RecursiveScriptModule, Union[np.ndarray, Image.Image]], Any] = model_files['generator_func']
+    generator_func: Callable[
+        [RecursiveScriptModule, Union[np.ndarray, Image.Image]], Any
+    ] = model_files["generator_func"]
 
     return partial(generator_func, model)
 
 
-def get_autoencoder(model_name) -> Callable[[Image.Image], Tuple[Image.Image, np.ndarray]]:
+def get_autoencoder(
+    model_name: str,
+) -> Callable[[Image.Image], Tuple[Image.Image, np.ndarray]]:
     """
     get_autoencoder
 
@@ -178,8 +223,21 @@ def get_autoencoder(model_name) -> Callable[[Image.Image], Tuple[Image.Image, np
     """
     model_files: Dict[str, Union[str, Any]] = MODEL_REGISTER[model_name]
 
-    model: RecursiveScriptModule = download_and_loadmodel(model_files)
+    model: RecursiveScriptModule = download_and_load_model(model_files)
 
-    generator_func: Callable[[RecursiveScriptModule, np.ndarray], Any] = model_files['autoencoder_func']
+    generator_func: Callable[[RecursiveScriptModule, np.ndarray], Any] = model_files[
+        "autoencoder_func"
+    ]
 
     return partial(generator_func, model)
+
+
+def get_text_function(model_name: str):
+    model_files = MODEL_REGISTER[model_name]
+
+    model: RecursiveScriptModule = download_and_load_model(model_files)
+    vocab: Dict[str, Vocab] = download_and_load_vocab(model_files)
+
+    text_func = model_files["text_func"]
+
+    return partial(text_func, model, vocab)

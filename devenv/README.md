@@ -14,9 +14,9 @@ conda env create -f devenv/environment.yaml
 or install the packages manually
 ```shell script
 conda create -n thetensorclan-aws python=3.7
-conda install pytorch torchvision cudatoolkit=10.2 -c pytorch
+conda install pytorch torchvision cudatoolkit=10.2 torchtext -c pytorch
 conda install -c anaconda flask boto3 flask-cors
-conda install -c conda-forge dlib opencv
+conda install -c conda-forge dlib opencv spacy
 pip install onnxruntime
 ```
 
@@ -26,3 +26,11 @@ exporting environment
 ```shell script
 conda env export --no-builds > devenv/environment.yml
 ```
+
+use black for formatting code
+```shell script
+pip install black
+```
+
+follow this guide: https://black.readthedocs.io/en/stable/editor_integration.html
+

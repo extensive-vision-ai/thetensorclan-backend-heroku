@@ -15,35 +15,40 @@ from flask_cors import CORS, cross_origin
 from werkzeug.datastructures import FileStorage
 
 from models import get_classifier
-from models.model_handlers import MODEL_REGISTER, get_generator, get_autoencoder
+from models.model_handlers import MODEL_REGISTER, get_generator, get_autoencoder, get_text_function
 from utils import setup_logger, allowed_file, file2image
 from utils.upload_utils import image2b64
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 logger = setup_logger(__name__)
-logger.info('=> Finished Importing')
+logger.info("=> Finished Importing")
 
 # attach our logger to the system exceptions
-sys.excepthook = lambda type, val, tb: logger.error("Unhandled exception:", exc_info=val)
+sys.excepthook = lambda type, val, tb: logger.error(
+    "Unhandled exception:", exc_info=val
+)
 
 app: Flask = Flask(__name__)
 cors: CORS = CORS(app=app)
-app.config['CORS_HEADERS'] = 'Content-Type'
+app.config["CORS_HEADERS"] = "Content-Type"
 
-if 'PRODUCTION' not in os.environ:
-    app.config['DEBUG'] = True
+if "PRODUCTION" not in os.environ:
+    app.config["DEBUG"] = True
 
 
 @app.route("/")
 @cross_origin()
 def hello_thetensorclan() -> Tuple[Any, int]:
-    return jsonify({'message': 'You\'ve reached the TensorClan Heroku Backend EndPoint'}), 200
+    return (
+        jsonify({"message": "You've reached the TensorClan Heroku Backend EndPoint"}),
+        200,
+    )
 
 
-@app.route("/classify/<model_handle>", methods=['POST'])
+@app.route("/classify/<model_handle>", methods=["POST"])
 @cross_origin()
-def classify_image_api(model_handle='resnet34-imagenet') -> Response:
+def classify_image_api(model_handle="resnet34-imagenet") -> Response:
     """
 
     Args:
@@ -54,15 +59,17 @@ def classify_image_api(model_handle='resnet34-imagenet') -> Response:
                     else return a json of sorted List[Dict[{'class_idx': idx, 'class_name': cn, 'confidence': 'c'}]]
     """
     if model_handle not in MODEL_REGISTER:
-        return Response({'error': f'{model_handle} not found in registered models'}, status=404)
+        return Response(
+            {"error": f"{model_handle} not found in registered models"}, status=404
+        )
 
-    if 'file' not in request.files:
-        return Response({'error': 'No file part'}, status=412)
+    if "file" not in request.files:
+        return Response({"error": "No file part"}, status=412)
 
-    file: FileStorage = request.files['file']
+    file: FileStorage = request.files["file"]
 
-    if file.filename == '':
-        return Response({'error': 'No file selected'}, status=417)
+    if file.filename == "":
+        return Response({"error": "No file selected"}, status=417)
 
     if allowed_file(file.filename):
         image: Image = file2image(file)
@@ -71,12 +78,12 @@ def classify_image_api(model_handle='resnet34-imagenet') -> Response:
         return Response(json.dumps(output), status=200)
 
     else:
-        return Response({'error': f'{file.mimetype} not allowed'}, status=412)
+        return Response({"error": f"{file.mimetype} not allowed"}, status=412)
 
 
-@app.route("/generators/<model_handle>", methods=['POST'])
+@app.route("/generators/<model_handle>", methods=["POST"])
 @cross_origin()
-def generator_api(model_handle='red-car-gan-generator') -> Response:
+def generator_api(model_handle="red-car-gan-generator") -> Response:
     """
     generator_api
 
@@ -92,15 +99,24 @@ def generator_api(model_handle='red-car-gan-generator') -> Response:
 
     """
     if model_handle not in MODEL_REGISTER:
-        return make_response(jsonify({'error': f'{model_handle} not found in registered models'}), 404)
+        return make_response(
+            jsonify({"error": f"{model_handle} not found in registered models"}), 404
+        )
 
-    if model_handle in MODEL_REGISTER and MODEL_REGISTER[model_handle]['type'] != 'gan-generator':
-        return make_response(jsonify({'error': f'{model_handle} model is not a GAN'}), 412)
+    if (
+        model_handle in MODEL_REGISTER
+        and MODEL_REGISTER[model_handle]["type"] != "gan-generator"
+    ):
+        return make_response(
+            jsonify({"error": f"{model_handle} model is not a GAN"}), 412
+        )
 
-    if 'latent_z_size' in MODEL_REGISTER[model_handle]:
+    if "latent_z_size" in MODEL_REGISTER[model_handle]:
         # this is a latentz input type of gan model
-        if 'latent_z' not in request.form:
-            return make_response(jsonify({'error': 'latent_z not found in the form'}), 412)
+        if "latent_z" not in request.form:
+            return make_response(
+                jsonify({"error": "latent_z not found in the form"}), 412
+            )
 
         latent_z = json.loads(f"[{request.form['latent_z']}]")
         latent_z = np.array(latent_z, dtype=np.float32)
@@ -113,16 +129,16 @@ def generator_api(model_handle='red-car-gan-generator') -> Response:
 
         return make_response(jsonify(b64_image), 200)
 
-    if 'input_shape' in MODEL_REGISTER[model_handle]:
+    if "input_shape" in MODEL_REGISTER[model_handle]:
         # this is a image input type of gan model
 
-        if 'file' not in request.files:
-            return make_response(jsonify({'error': 'No file part'}), 412)
+        if "file" not in request.files:
+            return make_response(jsonify({"error": "No file part"}), 412)
 
-        file: FileStorage = request.files['file']
+        file: FileStorage = request.files["file"]
 
-        if file.filename == '':
-            return make_response(jsonify({'error': 'No file selected'}), 417)
+        if file.filename == "":
+            return make_response(jsonify({"error": "No file selected"}), 417)
 
         if allowed_file(file.filename):
             image: Image = file2image(file)
@@ -134,12 +150,12 @@ def generator_api(model_handle='red-car-gan-generator') -> Response:
 
             return make_response(jsonify(b64_image), 200)
 
-    return make_response(jsonify({'error': f'{model_handle} is not a valid GAN'}), 412)
+    return make_response(jsonify({"error": f"{model_handle} is not a valid GAN"}), 412)
 
 
-@app.route("/autoencoders/<model_handle>", methods=['POST'])
+@app.route("/autoencoders/<model_handle>", methods=["POST"])
 @cross_origin()
-def autoencoder_api(model_handle='red-car-autoencoder') -> Response:
+def autoencoder_api(model_handle="red-car-autoencoder") -> Response:
     """
 
     autoencoder_api
@@ -160,18 +176,25 @@ def autoencoder_api(model_handle='red-car-autoencoder') -> Response:
 
     """
     if model_handle not in MODEL_REGISTER:
-        return make_response(jsonify({'error': f'{model_handle} not found in registered models'}), 404)
+        return make_response(
+            jsonify({"error": f"{model_handle} not found in registered models"}), 404
+        )
 
-    if model_handle in MODEL_REGISTER and MODEL_REGISTER[model_handle]['type'] != 'variational-autoencoder':
-        return make_response(jsonify({'error': f'{model_handle} model is not an AutoEncoder'}), 412)
+    if (
+        model_handle in MODEL_REGISTER
+        and MODEL_REGISTER[model_handle]["type"] != "variational-autoencoder"
+    ):
+        return make_response(
+            jsonify({"error": f"{model_handle} model is not an AutoEncoder"}), 412
+        )
 
-    if 'file' not in request.files:
-        return make_response(jsonify({'error': 'No file part'}), 412)
+    if "file" not in request.files:
+        return make_response(jsonify({"error": "No file part"}), 412)
 
-    file: FileStorage = request.files['file']
+    file: FileStorage = request.files["file"]
 
-    if file.filename == '':
-        return make_response(jsonify({'error': 'No file selected'}), 417)
+    if file.filename == "":
+        return make_response(jsonify({"error": "No file selected"}), 417)
 
     if allowed_file(file.filename):
         image: Image = file2image(file)
@@ -182,16 +205,39 @@ def autoencoder_api(model_handle='red-car-autoencoder') -> Response:
 
         # convert it to b64 bytes
         b64_image = image2b64(output)
-        return make_response(jsonify(dict(
-            recon_image=b64_image,
-            latent_z=latent_z.tolist()
-        )), 200)
+        return make_response(
+            jsonify(dict(recon_image=b64_image, latent_z=latent_z.tolist())), 200
+        )
 
     else:
-        return make_response(jsonify({'error': f'{file.mimetype} not allowed'}), 412)
+        return make_response(jsonify({"error": f"{file.mimetype} not allowed"}), 412)
 
 
-@app.route("/human-pose", methods=['POST'])
+@app.route("/text/<model_handle>", methods=["POST"])
+@cross_origin()
+def text_api(model_handle="conv-sentimental-mclass") -> Response:
+    if model_handle not in MODEL_REGISTER:
+        return make_response(
+            jsonify({"error": f"{model_handle} not found in registered models"}), 404
+        )
+
+    if "input_text" not in request.form:
+        return make_response(
+            jsonify({"error": "input_text not found in the form"}), 412
+        )
+
+    input_text = request.form['input_text']
+
+    text_func = get_text_function(model_handle)
+    output = text_func(input_text)
+
+    return make_response(
+        jsonify(output),
+        200
+    )
+
+
+@app.route("/human-pose", methods=["POST"])
 @cross_origin()
 def get_human_pose() -> Response:
     """
@@ -205,13 +251,13 @@ def get_human_pose() -> Response:
     """
     from models import get_pose
 
-    if 'file' not in request.files:
-        return Response({'error': 'No file part'}, status=412)
+    if "file" not in request.files:
+        return Response({"error": "No file part"}, status=412)
 
-    file: FileStorage = request.files['file']
+    file: FileStorage = request.files["file"]
 
-    if file.filename == '':
-        return Response({'error': 'No file selected'}, status=417)
+    if file.filename == "":
+        return Response({"error": "No file selected"}, status=417)
 
     if allowed_file(file.filename):
         image: Image = file2image(file)
@@ -223,4 +269,4 @@ def get_human_pose() -> Response:
         return jsonify(b64_pose), 200
 
     else:
-        return Response({'error': f'{file.mimetype} not allowed'}, status=412)
+        return Response({"error": f"{file.mimetype} not allowed"}, status=412)

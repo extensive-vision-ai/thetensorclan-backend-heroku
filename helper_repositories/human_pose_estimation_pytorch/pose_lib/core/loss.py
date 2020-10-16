@@ -30,7 +30,7 @@ class JointsMSELoss(nn.Module):
             if self.use_target_weight:
                 loss += 0.5 * self.criterion(
                     heatmap_pred.mul(target_weight[:, idx]),
-                    heatmap_gt.mul(target_weight[:, idx])
+                    heatmap_gt.mul(target_weight[:, idx]),
                 )
             else:
                 loss += 0.5 * self.criterion(heatmap_pred, heatmap_gt)

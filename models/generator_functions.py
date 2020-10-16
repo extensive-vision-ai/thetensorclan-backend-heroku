@@ -32,7 +32,9 @@ def norm_tensor_(t) -> None:
     norm_ip_(t, float(t.min()), float(t.max()))
 
 
-def generate_red_car_gan(model: RecursiveScriptModule, latent_z: np.ndarray) -> Image.Image:
+def generate_red_car_gan(
+    model: RecursiveScriptModule, latent_z: np.ndarray
+) -> Image.Image:
     """
     generate_red_car_gan
 
@@ -67,12 +69,16 @@ def generate_red_car_gan(model: RecursiveScriptModule, latent_z: np.ndarray) -> 
     return Image.fromarray(fake_img_arr)
 
 
-def generate_ifo_sr_gan(model: RecursiveScriptModule, image: Image.Image) -> Image.Image:
+def generate_ifo_sr_gan(
+    model: RecursiveScriptModule, image: Image.Image
+) -> Image.Image:
 
-    trans: T.Compose = T.Compose([
-        T.Resize((200, 200)),
-        T.ToTensor(),
-    ])
+    trans: T.Compose = T.Compose(
+        [
+            T.Resize((200, 200)),
+            T.ToTensor(),
+        ]
+    )
 
     img_tensor: Tensor = trans(image).unsqueeze(0)
 

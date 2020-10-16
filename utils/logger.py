@@ -19,13 +19,13 @@ def setup_logger(name: str) -> Logger:
     Returns:
         (Logger)
     """
-    logger: Logger = logging.getLogger(f'{name}')
+    logger: Logger = logging.getLogger(f"{name}")
 
     if not logger.hasHandlers():
         logger.setLevel(LOG_LEVEL)  # set the logging level
         # logging format
         logger_format: Formatter = logging.Formatter(
-            '[ %(asctime)s - %(name)s ] %(levelname)s: %(message)s'
+            "[ %(asctime)s - %(name)s ] %(levelname)s: %(message)s"
         )
 
         stream_handler: StreamHandler = logging.StreamHandler(sys.stdout)
@@ -39,7 +39,7 @@ def setup_logger(name: str) -> Logger:
         logger.setLevel(LOG_LEVEL)  # set the logging level
         # logging format
         logger_format: Formatter = logging.Formatter(
-            'thetensorclan [ %(asctime)s - %(name)s ] %(levelname)s: %(message)s'
+            "thetensorclan [ %(asctime)s - %(name)s ] %(levelname)s: %(message)s"
         )
         handler = logger.handlers[0]
         handler.setFormatter(logger_format)
