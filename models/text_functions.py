@@ -5,24 +5,17 @@ from __future__ import print_function
 from logging import Logger
 from typing import List, Dict, Any
 
-import spacy
+import en_core_web_sm
 import torch
-import torch.nn.functional as F
 from spacy.lang.en import English
-import en_core_web_md
 from torch import Tensor
 from torch.jit import RecursiveScriptModule
 from torchtext.vocab import Vocab
+import torch.nn.functional as F
 
 from utils import setup_logger
 
 logger: Logger = setup_logger(__name__)
-
-# nlp: English = spacy.load("en_core_web_md")
-nlp: English = en_core_web_md.load()
-
-import torch.nn as nn
-import torch.nn.functional as F
 
 
 def classify_conv_sentimental_mclass(
@@ -37,6 +30,8 @@ def classify_conv_sentimental_mclass(
         sentence: the text who class is to be determined
     """
 
+    nlp: English = en_core_web_sm.load()
+
     text_vocab: Vocab = vocabs["TEXT.vocab"]
     label_vocab: Vocab = vocabs["LABEL.vocab"]
 
@@ -48,9 +43,6 @@ def classify_conv_sentimental_mclass(
     indexed: List[int] = [text_vocab.stoi[t] for t in tokenized]
     input_tensor: Tensor = torch.LongTensor(indexed)
     input_tensor = input_tensor.unsqueeze(1)
-
-    # print(input_tensor.shape)
-    # return
 
     with torch.no_grad():
         predicted: Tensor = model(input_tensor)
