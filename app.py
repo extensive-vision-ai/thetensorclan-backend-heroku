@@ -5,17 +5,24 @@ from __future__ import print_function
 import json
 import os
 import sys
-from typing import Tuple, Any
+from functools import wraps
+from typing import Tuple, Any, Union
 
 import numpy as np
 from PIL import ImageFile
 from PIL.Image import Image
-from flask import Flask, jsonify, request, Response, make_response
+from flask import Flask, jsonify, request, Response, make_response, Request
 from flask_cors import CORS, cross_origin
 from werkzeug.datastructures import FileStorage
 
 from models import get_classifier
-from models.model_handlers import MODEL_REGISTER, get_generator, get_autoencoder, get_text_function
+from models.model_handlers import (
+    MODEL_REGISTER,
+    get_generator,
+    get_autoencoder,
+    get_text_function,
+    get_style_transfer_function,
+)
 from utils import setup_logger, allowed_file, file2image
 from utils.upload_utils import image2b64
 
@@ -104,8 +111,8 @@ def generator_api(model_handle="red-car-gan-generator") -> Response:
         )
 
     if (
-        model_handle in MODEL_REGISTER
-        and MODEL_REGISTER[model_handle]["type"] != "gan-generator"
+            model_handle in MODEL_REGISTER
+            and MODEL_REGISTER[model_handle]["type"] != "gan-generator"
     ):
         return make_response(
             jsonify({"error": f"{model_handle} model is not a GAN"}), 412
@@ -181,8 +188,8 @@ def autoencoder_api(model_handle="red-car-autoencoder") -> Response:
         )
 
     if (
-        model_handle in MODEL_REGISTER
-        and MODEL_REGISTER[model_handle]["type"] != "variational-autoencoder"
+            model_handle in MODEL_REGISTER
+            and MODEL_REGISTER[model_handle]["type"] != "variational-autoencoder"
     ):
         return make_response(
             jsonify({"error": f"{model_handle} model is not an AutoEncoder"}), 412
@@ -226,14 +233,94 @@ def text_api(model_handle="conv-sentimental-mclass") -> Response:
             jsonify({"error": "input_text not found in the form"}), 412
         )
 
-    input_text = request.form['input_text']
+    input_text = request.form["input_text"]
 
     text_func = get_text_function(model_handle)
     output = text_func(input_text)
 
+    return make_response(jsonify(output), 200)
+
+
+def model_handle_check(model_type):
+    def decorator(api_func):
+        @wraps(api_func)
+        def wrapper(*args, model_handle, **kwargs):
+            if model_handle not in MODEL_REGISTER:
+                return make_response(
+                    jsonify(
+                        {"error": f"{model_handle} not found in registered models"}
+                    ),
+                    404,
+                )
+
+            if (
+                    model_handle in MODEL_REGISTER
+                    and MODEL_REGISTER[model_handle]["type"] != model_type
+            ):
+                return make_response(
+                    jsonify({"error": f"{model_handle} model is not an {model_type}"}),
+                    412,
+                )
+
+            if "file" not in request.files:
+                return make_response(jsonify({"error": "No file part"}), 412)
+
+            return api_func(*args, model_handle=model_handle, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def get_image_from_request(
+        from_request: Request, file_key: str
+) -> Union[Response, Image]:
+    file: FileStorage = from_request.files[file_key]
+
+    if file.filename == "":
+        return make_response(jsonify({"error": "No file selected"}), 417)
+
+    if allowed_file(file.filename):
+        image: Image = file2image(file)
+        return image
+
+    else:
+        return make_response(jsonify({"error": f"{file.mimetype} not allowed"}), 412)
+
+
+@app.route("/style-transfer/<model_handle>/<style_name>", methods=["POST"])
+@cross_origin()
+@model_handle_check(model_type="style-transfer")
+def style_transfer_api(
+        model_handle="fast-style-transfer", style_name="candy"
+) -> Response:
+    # check if its a valid style
+    if style_name not in MODEL_REGISTER[model_handle]["model_stack"]:
+        return make_response(
+            jsonify({"error": f"{style_name} not in model_stack of {model_handle}"}),
+            404,
+        )
+
+    # get the input image from the request
+    returned_val: Union[Response, Image] = get_image_from_request(
+        from_request=request, file_key="file"
+    )
+
+    # if a response is already created during process i.e. an error, then return that
+    if isinstance(returned_val, Response):
+        response: Response = returned_val
+        return response
+
+    image: Image = returned_val
+
+    # now process the image
+    style_transfer = get_style_transfer_function(model_handle, style_name)
+    output: Image = style_transfer(image)
+
+    # convert it to b64 bytes
+    b64_image = image2b64(output)
     return make_response(
-        jsonify(output),
-        200
+        jsonify(b64_image), 200
     )
 
 

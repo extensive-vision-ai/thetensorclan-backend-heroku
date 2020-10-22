@@ -7,19 +7,90 @@ import os
 from functools import partial
 from pathlib import Path
 from typing import Union, Callable
+from abc import ABC, abstractmethod
 
 import pickle
 import gdown
+import requests
+
+# noinspection PyUnresolvedReferences
 import torch
+
+# noinspection PyUnresolvedReferences
 import torchtext
+from requests.models import Response
 from torch.jit import RecursiveScriptModule
+from functools import wraps
 
 from .autoencoder_functions import *
 from .classifier_functions import *
 from .generator_functions import *
 from .text_functions import *
+from .style_functions import *
 
 logger: Logger = setup_logger(__name__)
+
+
+def get_temp_folder():
+    environ = "heroku"
+
+    if environ is "heroku":
+        return Path("/tmp")
+
+    # local
+    return Path("tmp")
+
+
+class Downloadable(ABC):
+    def __init__(self, file_name: str):
+        self.file_name: str = file_name
+
+    @abstractmethod
+    def download(self):
+        raise NotImplementedError
+
+
+class GithubRawFile(Downloadable):
+    def __init__(self, file_name: str, file_url: str):
+        super(GithubRawFile, self).__init__(file_name)
+        self.file_url: str = file_url
+
+    def download(self):
+        logger.info(
+            f"=> Downloading GithubRawFile {self.file_name} from {self.file_url}"
+        )
+
+        # heroku gives you `/tmp` to store files, which can be cached
+        file_path: Path = get_temp_folder() / f"{self.file_name}"
+        if not file_path.exists():
+            r: Response = requests.get(self.file_url)
+            with file_path.open("wb") as f:
+                f.write(r.content)  # write the contents to file
+
+        return file_path
+
+
+class GoogleDriveFile(Downloadable):
+    def __init__(self, file_name, file_id):
+        super(GoogleDriveFile, self).__init__(file_name)
+        self.file_id = file_id
+
+    @property
+    def gdrive_url(self):
+        return f"https://drive.google.com/uc?id={self.file_id}"
+
+    def download(self):
+        logger.info(
+            f"=> Downloading GDrive file {self.file_name} from {self.gdrive_url}"
+        )
+
+        # heroku gives you `/tmp` to store files, which can be cached
+        file_path: Path = get_temp_folder() / f"{self.file_name}"
+        if not file_path.exists():
+            gdown.cached_download(url=self.gdrive_url, path=file_path)
+
+        return file_path
+
 
 """
 The model file must have .pt extension
@@ -85,6 +156,28 @@ MODEL_REGISTER: Dict[str, Dict[str, Union[str, Any]]] = {
         "model_file": "conv-sentimental-mclass.scripted",
         "model_url": "https://drive.google.com/uc?id=1vJ7OLV5Y-xTX_xL3C0QgdT6qhmjIF0cj",
         "text_func": classify_conv_sentimental_mclass,
+    },
+    "fast-style-transfer": {
+        "type": "style-transfer",
+        "model_stack": {
+            "candy": GoogleDriveFile(
+                file_name="candy.scripted.pt",
+                file_id="14W66DZbu8dnoWME-9Bs82yNBnqg059MJ",
+            ),
+            "mosaic": GoogleDriveFile(
+                file_name="mosaic.scripted.pt",
+                file_id="1_wgJZNHpJmI9n3A1nvps97jlPPUgF6R2",
+            ),
+            "rain_princess": GoogleDriveFile(
+                file_name="rain_princess.scripted.pt",
+                file_id="1Xr83ZZc3qtTJhL3mUNUcJkHFZ8boJqJg",
+            ),
+            "udnie": GoogleDriveFile(
+                file_name="udnie.scripted.pt",
+                file_id="1BFvOzva_ka2sIczs_5Hm5ByuUX54nWdm",
+            ),
+        },
+        "transfer_func": fast_style_transfer,
     },
 }
 
@@ -241,3 +334,25 @@ def get_text_function(model_name: str):
     text_func = model_files["text_func"]
 
     return partial(text_func, model, vocab)
+
+
+def get_style_transfer_function(
+    model_name: str, style_name: str
+) -> Callable[[Image.Image], Image.Image]:
+    model_files: Dict[str, Any] = MODEL_REGISTER[model_name]["model_stack"]
+
+    model_file: GoogleDriveFile = model_files[style_name]
+
+    model: RecursiveScriptModule = torch.jit.load(str(model_file.download()))
+
+    transfer_func: Callable[
+        [RecursiveScriptModule, Image.Image], Image.Image
+    ] = MODEL_REGISTER[model_name]["transfer_func"]
+
+    # a drop in replacement for partial
+    # fixes the type hint inference problem in partial
+    @wraps(transfer_func)
+    def wrapper(image: Image.Image) -> Image.Image:
+        return transfer_func(model, image)
+
+    return wrapper
