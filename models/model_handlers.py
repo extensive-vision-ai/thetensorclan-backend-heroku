@@ -87,7 +87,7 @@ class GoogleDriveFile(Downloadable):
         # heroku gives you `/tmp` to store files, which can be cached
         file_path: Path = get_temp_folder() / f"{self.file_name}"
         if not file_path.exists():
-            gdown.download(self.gdrive_url, file_path, quiet=True)
+            gdown.download(self.gdrive_url, str(file_path), quiet=True)
 
         return file_path
 
