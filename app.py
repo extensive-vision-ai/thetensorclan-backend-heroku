@@ -22,6 +22,7 @@ from models.model_handlers import (
     get_autoencoder,
     get_text_function,
     get_style_transfer_function,
+get_text_translate_function
 )
 from utils import setup_logger, allowed_file, file2image
 from utils.upload_utils import image2b64
@@ -111,8 +112,8 @@ def generator_api(model_handle="red-car-gan-generator") -> Response:
         )
 
     if (
-            model_handle in MODEL_REGISTER
-            and MODEL_REGISTER[model_handle]["type"] != "gan-generator"
+        model_handle in MODEL_REGISTER
+        and MODEL_REGISTER[model_handle]["type"] != "gan-generator"
     ):
         return make_response(
             jsonify({"error": f"{model_handle} model is not a GAN"}), 412
@@ -188,8 +189,8 @@ def autoencoder_api(model_handle="red-car-autoencoder") -> Response:
         )
 
     if (
-            model_handle in MODEL_REGISTER
-            and MODEL_REGISTER[model_handle]["type"] != "variational-autoencoder"
+        model_handle in MODEL_REGISTER
+        and MODEL_REGISTER[model_handle]["type"] != "variational-autoencoder"
     ):
         return make_response(
             jsonify({"error": f"{model_handle} model is not an AutoEncoder"}), 412
@@ -241,6 +242,27 @@ def text_api(model_handle="conv-sentimental-mclass") -> Response:
     return make_response(jsonify(output), 200)
 
 
+@app.route("/text/translate/<source_ln>/<target_ln>", methods=["POST"])
+@cross_origin()
+def translate_text(source_ln="de", target_ln="en") -> Response:
+    if "source_text" not in request.form:
+        return make_response(
+            jsonify({"error": "input_text not found in the form"}), 412
+        )
+
+    source_text = request.form["source_text"]
+
+    if source_ln == "de" and target_ln == "en":
+        translate_func = get_text_translate_function("annotated-encoder-decoder-de-en")
+        output = translate_func(source_text)
+
+        return make_response(jsonify(output), 200)
+    else:
+        return make_response(
+            jsonify({"error": f"{source_ln} -> {target_ln} not supported"}), 404
+        )
+
+
 def model_handle_check(model_type):
     def decorator(api_func):
         @wraps(api_func)
@@ -254,8 +276,8 @@ def model_handle_check(model_type):
                 )
 
             if (
-                    model_handle in MODEL_REGISTER
-                    and MODEL_REGISTER[model_handle]["type"] != model_type
+                model_handle in MODEL_REGISTER
+                and MODEL_REGISTER[model_handle]["type"] != model_type
             ):
                 return make_response(
                     jsonify({"error": f"{model_handle} model is not an {model_type}"}),
@@ -273,7 +295,7 @@ def model_handle_check(model_type):
 
 
 def get_image_from_request(
-        from_request: Request, file_key: str
+    from_request: Request, file_key: str
 ) -> Union[Response, Image]:
     file: FileStorage = from_request.files[file_key]
 
@@ -292,7 +314,7 @@ def get_image_from_request(
 @cross_origin()
 @model_handle_check(model_type="style-transfer")
 def style_transfer_api(
-        model_handle="fast-style-transfer", style_name="candy"
+    model_handle="fast-style-transfer", style_name="candy"
 ) -> Response:
     # check if its a valid style
     if style_name not in MODEL_REGISTER[model_handle]["model_stack"]:
@@ -319,9 +341,7 @@ def style_transfer_api(
 
     # convert it to b64 bytes
     b64_image = image2b64(output)
-    return make_response(
-        jsonify(b64_image), 200
-    )
+    return make_response(jsonify(b64_image), 200)
 
 
 @app.route("/human-pose", methods=["POST"])

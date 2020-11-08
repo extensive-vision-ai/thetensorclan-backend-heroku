@@ -28,6 +28,8 @@ from .generator_functions import *
 from .text_functions import *
 from .style_functions import *
 
+from .translator_models import annotated_encoder_decoder_de_en
+
 logger: Logger = setup_logger(__name__)
 
 
@@ -84,10 +86,9 @@ class GoogleDriveFile(Downloadable):
             f"=> Downloading GDrive file {self.file_name} from {self.gdrive_url}"
         )
 
-        # heroku gives you `/tmp` to store files, which can be cached
         file_path: Path = get_temp_folder() / f"{self.file_name}"
         if not file_path.exists():
-            gdown.download(self.gdrive_url, str(file_path), quiet=True)
+            gdown.cached_download(url=self.gdrive_url, path=file_path)
 
         return file_path
 
@@ -179,7 +180,39 @@ MODEL_REGISTER: Dict[str, Dict[str, Union[str, Any]]] = {
         },
         "transfer_func": fast_style_transfer,
     },
+    "annotated-encoder-decoder-de-en": {
+        "type": "translate-de-en",
+        "metadata": GoogleDriveFile(
+            file_name="annotated-encoder-decoder-de-en-meta.dill.pkl",
+            file_id="1G4HuvGrgUMAUB8Qp_bqoLaKQNzA_yZbt",
+        ),
+        "model": GoogleDriveFile(
+            file_name="annotated-encoder-decoder-de-en.pt",
+            file_id="10oPjInWl0kH8kITq6HtZUgdxjf1TS0-e",
+        ),
+        "translate_func": translate_annotated_encoder_decoder_de_en,
+    },
 }
+
+
+def load_meta_pkl(path):
+    import pickle
+
+    inp = open(path, "rb")
+    meta = pickle.load(inp)
+    inp.close()
+
+    return meta
+
+
+def load_meta_dill(path):
+    import dill
+
+    inp = open(path, "rb")
+    meta = dill.load(inp)
+    inp.close()
+
+    return meta
 
 
 def download_and_load_vocab(model_files) -> Dict[str, Vocab]:
@@ -334,6 +367,46 @@ def get_text_function(model_name: str):
     text_func = model_files["text_func"]
 
     return partial(text_func, model, vocab)
+
+
+def get_text_translate_function(model_name: str) -> Callable[[str], str]:
+    model_files = MODEL_REGISTER[model_name]
+
+    if model_name == "annotated-encoder-decoder-de-en":
+        meta_file: GoogleDriveFile = model_files["metadata"]
+        model_file: GoogleDriveFile = model_files["model"]
+
+        meta: Dict[str, Any] = load_meta_dill(meta_file.download())
+        model_state: Dict[str, Tensor] = torch.load(
+            model_file.download(), map_location="cpu"
+        )
+
+        logger.info("=> Loading annotated_encoder_decoder_de_en.EncoderDecoder")
+
+        model: annotated_encoder_decoder_de_en.EncoderDecoder = (
+            annotated_encoder_decoder_de_en.make_model(
+                len(meta["SRC.vocab.itos"]),
+                len(meta["TRG.vocab.itos"]),
+                emb_size=256,
+                hidden_size=256,
+                num_layers=1,
+                dropout=0.2,
+            )
+        )
+        model.load_state_dict(model_state)
+
+        translate_func: Callable[
+            [annotated_encoder_decoder_de_en.EncoderDecoder, Dict[str, Any], str], str
+        ] = model_files["translate_func"]
+
+        @wraps(translate_func)
+        def wrapper(source_text: str) -> str:
+            return translate_func(model, meta, source_text)
+
+        return wrapper
+
+    else:
+        raise Exception(f"UNKNOWN {model_name}")
 
 
 def get_style_transfer_function(

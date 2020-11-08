@@ -6,8 +6,14 @@ from logging import Logger
 from typing import List, Dict, Any
 
 import en_core_web_sm
-import torch
+import de_core_news_sm
+
 from spacy.lang.en import English
+from spacy.lang.de import German
+
+from .translator_models import annotated_encoder_decoder_de_en
+
+import torch
 from torch import Tensor
 from torch.jit import RecursiveScriptModule
 from torchtext.vocab import Vocab
@@ -62,3 +68,41 @@ def classify_conv_sentimental_mclass(
     )
 
     return toppreds
+
+
+def translate_annotated_encoder_decoder_de_en(
+    model: annotated_encoder_decoder_de_en.EncoderDecoder,
+    meta: Dict[str, Any],
+    source_text: str,
+) -> str:
+
+    spacy_de: German = de_core_news_sm.load()
+
+    def tokenize_de(text):
+        return [tok.text for tok in spacy_de.tokenizer(text)]
+
+    src_tok: List[str] = tokenize_de(source_text)
+
+    src_idx: List[int] = [meta["SRC.vocab.stoi"][x] for x in src_tok] + [
+        meta["SRC.vocab.stoi"][meta["EOS_TOKEN"]]
+    ]
+    src: Tensor = torch.LongTensor(src_idx)
+    src_mask: Tensor = (src != meta["SRC.vocab.stoi"][meta["PAD_TOKEN"]]).unsqueeze(-2)
+    src_length: Tensor = torch.tensor(len(src))
+
+    # convert to batch size 1
+    src = src.unsqueeze(0)
+    src_mask = src_mask.unsqueeze(0)
+    src_length = src_length.unsqueeze(0)
+
+    output = annotated_encoder_decoder_de_en.greedy_decode(
+        model,
+        src,
+        src_mask,
+        src_length,
+        max_len=100,
+        sos_index=meta["TRG.vocab.stoi"][meta["SOS_TOKEN"]],
+        eos_index=meta["TRG.vocab.stoi"][meta["EOS_TOKEN"]],
+    )
+
+    return " ".join([meta["TRG.vocab.itos"][x] for x in output])
