@@ -6,7 +6,7 @@ import json
 import os
 import sys
 from functools import wraps
-from typing import Tuple, Any, Union
+from typing import Tuple, Any, Union, Callable
 
 import numpy as np
 from PIL import ImageFile
@@ -22,7 +22,8 @@ from models.model_handlers import (
     get_autoencoder,
     get_text_function,
     get_style_transfer_function,
-get_text_translate_function
+    get_text_translate_function,
+    get_image_captioning_function,
 )
 from utils import setup_logger, allowed_file, file2image
 from utils.upload_utils import image2b64
@@ -263,7 +264,43 @@ def translate_text(source_ln="de", target_ln="en") -> Response:
         )
 
 
+def form_file_check(file_key):
+    """
+    Checks if the file key is present in request.files
+
+    Args:
+        file_key: the key used to retrieve file from the request.files dict
+    """
+
+    def decorator(api_func):
+        @wraps(api_func)
+        def wrapper(*args, **kwargs):
+            if file_key not in request.files:
+                return make_response(jsonify({"error": "No file part"}), 412)
+
+            return api_func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
 def model_handle_check(model_type):
+    """
+    Checks for the model_type and model_handle on the api function,
+    model_type is a argument to this decorator, it steals model_handle and checks if it is
+    present in the MODEL_REGISTER
+
+    the api must have model_handle in it
+
+    Args:
+        model_type: the "type" of the model, as specified in the MODEL_REGISTER
+
+    Returns:
+        wrapped api function
+
+    """
+
     def decorator(api_func):
         @wraps(api_func)
         def wrapper(*args, model_handle, **kwargs):
@@ -283,9 +320,6 @@ def model_handle_check(model_type):
                     jsonify({"error": f"{model_handle} model is not an {model_type}"}),
                     412,
                 )
-
-            if "file" not in request.files:
-                return make_response(jsonify({"error": "No file part"}), 412)
 
             return api_func(*args, model_handle=model_handle, **kwargs)
 
@@ -342,6 +376,31 @@ def style_transfer_api(
     # convert it to b64 bytes
     b64_image = image2b64(output)
     return make_response(jsonify(b64_image), 200)
+
+
+@app.route("/image-captioning/<model_handle>", methods=["POST"])
+@cross_origin()
+@model_handle_check(model_type="image-caption")
+@form_file_check(file_key="file")
+def image_caption_api(model_handle="flickr8k-image-caption") -> Response:
+
+    # get the input image from the request
+    returned_val: Union[Response, Image] = get_image_from_request(
+        from_request=request, file_key="file"
+    )
+
+    # if a response is already created during process i.e. an error, then return that
+    if isinstance(returned_val, Response):
+        response: Response = returned_val
+        return response
+
+    image: Image = returned_val
+
+    # now process the image
+    image_caption: Callable[[Image], str] = get_image_captioning_function(model_handle)
+    output: str = image_caption(image)
+
+    return make_response(jsonify({"caption": output}), 200)
 
 
 @app.route("/human-pose", methods=["POST"])

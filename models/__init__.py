@@ -4,5 +4,6 @@ from .model_handlers import (
     MODEL_REGISTER,
     get_generator,
     get_autoencoder,
-    get_text_function
+    get_text_function,
+    get_image_captioning_function,
 )

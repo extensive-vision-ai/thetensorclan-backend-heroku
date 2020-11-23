@@ -6,7 +6,7 @@ import json
 import os
 from functools import partial
 from pathlib import Path
-from typing import Union, Callable
+from typing import Union, Callable, Optional
 from abc import ABC, abstractmethod
 
 import pickle
@@ -191,6 +191,22 @@ MODEL_REGISTER: Dict[str, Dict[str, Union[str, Any]]] = {
             file_id="10oPjInWl0kH8kITq6HtZUgdxjf1TS0-e",
         ),
         "translate_func": translate_annotated_encoder_decoder_de_en,
+    },
+    "flickr8k-image-caption": {
+        "type": "image-caption",
+        "encoder": GoogleDriveFile(
+            file_name="flickr8k_caption.encoder.scripted.pt",
+            file_id="1x8p0vjKBnKjCDyBLm8GhC2IHIGCn6Lr7",
+        ),
+        "decoder": GoogleDriveFile(
+            file_id="1wX4dJhr-i0spqRj5ge7I_IhngpRbNTFu",
+            file_name="flickr8k_caption.decoder.scripted.pt",
+        ),
+        "wordmap": GoogleDriveFile(
+            file_name="WORDMAP_flickr8k_5_cap_per_img_5_min_word_freq.json",
+            file_id="1ZfIO5rKq06c3UFuokISAcoc7O_bYuDJW",
+        ),
+        "caption_func": flickr8k_image_captioning,
     },
 }
 
@@ -427,5 +443,42 @@ def get_style_transfer_function(
     @wraps(transfer_func)
     def wrapper(image: Image.Image) -> Image.Image:
         return transfer_func(model, image)
+
+    return wrapper
+
+
+def get_image_captioning_function(model_name: str) -> Callable[[Image.Image], str]:
+    model_files: Dict[str, Any] = MODEL_REGISTER[model_name]
+
+    encoder_file: GoogleDriveFile = model_files["encoder"]
+    decoder_file: GoogleDriveFile = model_files["decoder"]
+    wordmap_file: GoogleDriveFile = model_files["wordmap"]
+
+    encoder: RecursiveScriptModule = torch.jit.load(
+        str(encoder_file.download()), map_location="cpu"
+    )
+
+    decoder: RecursiveScriptModule = torch.jit.load(
+        str(decoder_file.download()), map_location="cpu"
+    )
+
+    with wordmap_file.download().open("r") as f:
+        word_map: Dict[str, int] = json.load(f)
+
+    caption_func: Callable[
+        [
+            RecursiveScriptModule,
+            RecursiveScriptModule,
+            Dict[str, int],
+            Image.Image,
+            Optional[int],
+        ],
+        str,
+    ] = model_files["caption_func"]
+
+    @wraps(caption_func)
+    def wrapper(image: Image.Image) -> str:
+        with torch.no_grad():
+            return caption_func(encoder, decoder, word_map, image, 3)
 
     return wrapper
