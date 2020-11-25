@@ -17,3 +17,12 @@ heroku git:remote -a thetensorclan-backend
 git commit -m "update"
 git push heroku master
 ```
+
+## BuildPacks
+
+```shell script
+heroku buildpacks:set heroku/python
+heroku buildpacks:add --index 1 heroku-community/apt
+heroku buildpacks
+# Should show apt first, then python
+```
