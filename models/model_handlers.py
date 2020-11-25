@@ -27,6 +27,7 @@ from .classifier_functions import *
 from .generator_functions import *
 from .text_functions import *
 from .style_functions import *
+from .speech_functions import *
 
 from .translator_models import annotated_encoder_decoder_de_en
 
@@ -207,6 +208,14 @@ MODEL_REGISTER: Dict[str, Dict[str, Union[str, Any]]] = {
             file_id="1ZfIO5rKq06c3UFuokISAcoc7O_bYuDJW",
         ),
         "caption_func": flickr8k_image_captioning,
+    },
+    "speech-recognition-residual-model": {
+        "type": "speech-to-text",
+        "model": GoogleDriveFile(
+            file_name="speech-recognition-residual-model.scripted.pt",
+            file_id="12MmbJioSAA-hs5y-RpHF0-Al5nAHdcgG",
+        ),
+        "speech_function": speech_recognition_residual_text,
     },
 }
 
@@ -480,5 +489,25 @@ def get_image_captioning_function(model_name: str) -> Callable[[Image.Image], st
     def wrapper(image: Image.Image) -> str:
         with torch.no_grad():
             return caption_func(encoder, decoder, word_map, image, 3)
+
+    return wrapper
+
+
+def get_speech_to_text_function(model_name: str) -> Callable[[Tensor], str]:
+    model_files: Dict[str, Any] = MODEL_REGISTER[model_name]
+
+    model_file: GoogleDriveFile = model_files["model"]
+
+    model: RecursiveScriptModule = torch.jit.load(
+        str(model_file.download()), map_location="cpu"
+    )
+
+    speech_to_text_function: Callable[
+        [RecursiveScriptModule, Tensor], str
+    ] = model_files["speech_function"]
+
+    @wraps(speech_to_text_function)
+    def wrapper(input_audio: Tensor) -> str:
+        return speech_to_text_function(model, input_audio)
 
     return wrapper

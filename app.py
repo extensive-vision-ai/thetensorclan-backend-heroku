@@ -14,6 +14,7 @@ from PIL.Image import Image
 from flask import Flask, jsonify, request, Response, make_response, Request
 from flask_cors import CORS, cross_origin
 from werkzeug.datastructures import FileStorage
+from torch import Tensor
 
 from models import get_classifier
 from models.model_handlers import (
@@ -24,8 +25,9 @@ from models.model_handlers import (
     get_style_transfer_function,
     get_text_translate_function,
     get_image_captioning_function,
+    get_speech_to_text_function,
 )
-from utils import setup_logger, allowed_file, file2image
+from utils import setup_logger, allowed_file, file2image, file2audiotensor
 from utils.upload_utils import image2b64
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -328,6 +330,22 @@ def model_handle_check(model_type):
     return decorator
 
 
+def get_audio_from_request(
+    from_request: Request, file_key: str
+) -> Union[Response, Tensor]:
+    file: FileStorage = from_request.files[file_key]
+
+    if file.filename == "":
+        return make_response(jsonify({"error": "No file selected"}), 417)
+
+    if allowed_file(file.filename):
+        audio: Tensor = file2audiotensor(file)
+        return audio
+
+    else:
+        return make_response(jsonify({"error": f"{file.mimetype} not allowed"}), 412)
+
+
 def get_image_from_request(
     from_request: Request, file_key: str
 ) -> Union[Response, Image]:
@@ -401,6 +419,31 @@ def image_caption_api(model_handle="flickr8k-image-caption") -> Response:
     output: str = image_caption(image)
 
     return make_response(jsonify({"caption": output}), 200)
+
+
+@app.route("/speech-to-text/<model_handle>", methods=["POST"])
+@cross_origin()
+@model_handle_check(model_type="speech-to-text")
+@form_file_check(file_key="file")
+def speech_to_text_api(model_handle="speech-recognition-residual-model") -> Response:
+
+    # get the input audio from the request
+    returned_val: Union[Response, Tensor] = get_audio_from_request(
+        from_request=request, file_key="file"
+    )
+
+    # if a response is already created during process i.e. an error, then return that
+    if isinstance(returned_val, Response):
+        response: Response = returned_val
+        return response
+
+    audio: Tensor = returned_val
+
+    speech_to_text: Callable[[Tensor], str] = get_speech_to_text_function(model_handle)
+
+    output: str = speech_to_text(audio)
+
+    return make_response(jsonify({"text": output}), 200)
 
 
 @app.route("/human-pose", methods=["POST"])
